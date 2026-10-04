@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Boiler Controller HMI</title>
+<style>
+  :root{
+    --bg:#0b1118; --panel:#141e2a; --panel2:#1b2836; --line:#2b3b4d;
+    --txt:#e6edf3; --muted:#8ba1b6; --accent:#3aa0ff;
+    --ok:#22c55e; --warn:#f59e0b; --fault:#ef4444; --crit:#dc2626;
+    --info:#38bdf8; --purple:#a855f7;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Segoe UI',Tahoma,sans-serif;background:var(--bg);
+    color:var(--txt);font-size:13px;overflow-x:hidden}
+  header{background:linear-gradient(90deg,#050b14,#16283a);
+    padding:10px 18px;border-bottom:1px solid var(--line);
+    display:flex;justify-content:space-between;align-items:center;
+    position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:8px}
+  header h1{margin:0;font-size:15px;font-weight:600}
+  header h1 span{color:var(--accent)}
+  .badge{padding:3px 9px;border-radius:6px;background:var(--panel2);
+    border:1px solid var(--line);font-size:11px;font-weight:600;
+    font-variant-numeric:tabular-nums}
+  .badge.ok{background:rgba(34,197,94,.15);border-color:var(--ok);color:var(--ok)}
+  .badge.warn{background:rgba(245,158,11,.15);border-color:var(--warn);color:var(--warn)}
+  .badge.fault{background:rgba(239,68,68,.15);border-color:var(--fault);color:var(--fault)}
+  .badge.crit{background:rgba(220,38,38,.25);border-color:var(--crit);color:#ff6b6b;
+    animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+  .status{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .ws-status{width:8px;height:8px;border-radius:50%;background:var(--fault)}
+  .ws-status.connected{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+
+  .timescale{display:flex;gap:2px;background:var(--panel2);
+    border:1px solid var(--line);border-radius:6px;padding:2px}
+  .timescale button{background:transparent;border:none;color:var(--muted);
+    padding:4px 8px;border-radius:4px;cursor:pointer;font-size:10px;font-weight:600}
+  .timescale button.active{background:var(--accent);color:#fff}
+  .timescale button:hover:not(.active){background:var(--panel)}
+
+  nav{display:flex;gap:3px;padding:7px 18px;background:var(--panel);
+    border-bottom:1px solid var(--line);flex-wrap:wrap}
+  nav button{background:transparent;border:1px solid transparent;color:var(--muted);
+    padding:6px 11px;border-radius:6px;cursor:pointer;font-size:12px;font-family:inherit}
+  nav button:hover{background:var(--panel2);color:var(--txt)}
+  nav button.active{background:var(--accent);color:#fff}
+
+  main{padding:14px 18px;max-width:1600px;margin:0 auto}
+  .page{display:none}
+  .page.active{display:block}
+
+  .grid{display:grid;gap:12px}
+  .g2{grid-template-columns:repeat(auto-fit,minmax(360px,1fr))}
+  .g3{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+  .g4{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+  .card h3{margin:0 0 10px 0;font-size:12px;color:var(--muted);
+    font-weight:600;text-transform:uppercase;letter-spacing:.4px;
+    display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .metric{font-size:24px;font-weight:700;margin:3px 0;font-variant-numeric:tabular-nums}
+  .unit{font-size:12px;color:var(--muted);font-weight:400}
+  .label{font-size:11px;color:var(--muted)}
+  .row{display:flex;justify-content:space-between;padding:5px 0;
+    border-bottom:1px dashed var(--line);font-size:12px;align-items:center}
+  .row:last-child{border-bottom:none}
+  .row .k{color:var(--muted)}
+  .row .v{font-weight:600;font-variant-numeric:tabular-nums}
+
+  .led{display:inline-block;width:9px;height:9px;border-radius:50%;
+    margin-left:6px;vertical-align:middle}
+  .led.on{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+  .led.off{background:#3a4a5c}
+  .led.fault{background:var(--fault);box-shadow:0 0 6px var(--fault)}
+  .led.warn{background:var(--warn);box-shadow:0 0 6px var(--warn)}
+
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--line);
+    font-variant-numeric:tabular-nums}
+  th{color:var(--muted);font-weight:600;font-size:11px}
+  tr:hover{background:var(--panel2)}
+
+  .alarm{padding:9px 11px;border-radius:6px;margin-bottom:6px;
+    border-right:4px solid var(--muted);background:var(--panel2);font-size:12px}
+  .alarm.INFO{border-color:var(--info)}
+  .alarm.WARNING{border-color:var(--warn)}
+  .alarm.FAULT{border-color:var(--fault)}
+  .alarm.CRITICAL{border-color:var(--crit)}
+  .alarm.SAFETY{border-color:var(--purple)}
+  .alarm .t{font-weight:600;display:flex;justify-content:space-between;gap:8px;
+    align-items:center;flex-wrap:wrap}
+  .alarm .d{font-size:11px;color:var(--muted);margin-top:3px}
+  .alarm .r{font-size:11px;color:var(--accent);margin-top:3px}
+  .alarm .conf{font-size:10px;color:var(--warn);margin-top:3px;
+    padding:2px 6px;background:rgba(245,158,11,.15);border-radius:3px;
+    display:inline-block}
+
+  button.btn{background:var(--panel2);color:var(--txt);border:1px solid var(--line);
+    padding:6px 11px;border-radius:6px;cursor:pointer;font-size:12px;
+    transition:all .12s;font-family:inherit}
+  button.btn:hover{border-color:var(--accent)}
+  button.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.btn.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+  button.btn.danger{background:var(--fault);border-color:var(--fault);color:#fff}
+  button.btn.warn{background:var(--warn);border-color:var(--warn);color:#000}
+  button.btn.ghost{background:transparent}
+  button.btn.purple{background:var(--purple);border-color:var(--purple);color:#fff}
+  button.btn:disabled{opacity:.35;cursor:not-allowed}
+  button.btn.tiny{padding:2px 7px;font-size:10px}
+
+  input,select{background:var(--panel2);border:1px solid var(--line);color:var(--txt);
+    padding:5px 8px;border-radius:5px;font-size:12px;width:100%;
+    font-variant-numeric:tabular-nums;font-family:inherit}
+  input:focus,select:focus{outline:none;border-color:var(--accent)}
+  .field{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}
+  .field label{font-size:11px;color:var(--muted)}
+
+  .input-row{display:grid;grid-template-columns:170px 80px 1fr 70px;gap:8px;
+    align-items:center;padding:6px 0;border-bottom:1px dashed var(--line)}
+  .input-row .name{font-size:11px;color:var(--muted);display:flex;
+    align-items:center;gap:5px}
+  .input-row .num{font-size:12px;font-weight:600;text-align:left;
+    font-variant-numeric:tabular-nums}
+  .input-row input[type=number]{padding:3px 6px;font-size:11px}
+  input[type=range]{-webkit-appearance:none;appearance:none;background:transparent;height:20px;padding:0}
+  input[type=range]::-webkit-slider-runnable-track{height:5px;background:var(--panel2);
+    border-radius:3px;border:1px solid var(--line)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;
+    border-radius:50%;background:var(--accent);margin-top:-5px;cursor:pointer}
+  input[type=range].manual::-webkit-slider-thumb{background:var(--warn)}
+
+  .state-pill{display:inline-block;padding:3px 9px;border-radius:14px;font-size:11px;
+    font-weight:600;background:var(--panel2);border:1px solid var(--line)}
+  .state-pill.running{border-color:var(--ok);color:var(--ok)}
+  .state-pill.waiting{border-color:var(--warn);color:var(--warn)}
+  .state-pill.error{border-color:var(--fault);color:var(--fault)}
+
+  .flow-diagram{display:flex;flex-wrap:wrap;gap:5px;align-items:center;
+    padding:9px;background:var(--panel2);border-radius:8px;font-size:10px}
+  .flow-diagram .node{padding:4px 8px;background:var(--panel);border-radius:5px;
+    border:1px solid var(--line);transition:all .2s}
+  .flow-diagram .node.active{background:var(--accent);color:#fff;border-color:var(--accent);
+    box-shadow:0 0 10px rgba(58,160,255,.4)}
+  .flow-diagram .arrow{color:var(--muted);font-size:10px}
+
+  .log-entry{font-family:monospace;font-size:11px;padding:3px 0;
+    border-bottom:1px dashed var(--line);color:var(--muted)}
+  .log-entry .ts{color:var(--accent)}
+  .log-entry b{color:var(--txt)}
+
+  .chart{background:var(--panel2);border-radius:8px;padding:8px}
+  .chart canvas{width:100%;height:240px;display:block}
+
+  .kpi-strip{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+  .kpi{flex:1;min-width:150px;background:var(--panel);border:1px solid var(--line);
+    border-radius:8px;padding:10px}
+  .kpi .k{font-size:11px;color:var(--muted)}
+  .kpi .v{font-size:18px;font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums}
+
+  .override-tag{font-size:9px;padding:1px 5px;border-radius:3px;
+    background:var(--warn);color:#000;font-weight:700}
+  .auto-tag{font-size:9px;padding:1px 5px;border-radius:3px;
+    background:var(--ok);color:#000;font-weight:700}
+
+  .reset-banner{background:rgba(220,38,38,.15);border:1px solid var(--crit);
+    color:#ff6b6b;padding:8px 12px;border-radius:6px;margin-bottom:12px;
+    font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .reset-banner.hidden{display:none}
+
+  .fb-group{display:flex;gap:3px;align-items:center}
+  .fb-group .pill{padding:3px 8px;border-radius:4px;font-size:11px;
+    text-align:center;cursor:pointer;border:1px solid var(--line);
+    background:var(--panel2);user-select:none;min-width:36px}
+  .fb-group .pill.active{background:var(--ok);color:#000;border-color:var(--ok);
+    font-weight:700}
+  .fb-group .pill.off{color:var(--muted)}
+  .fb-group .pill.man{background:var(--warn);color:#000;border-color:var(--warn)}
+
+  .scenario{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+  .scenario button{padding:10px;text-align:right;font-size:11px;line-height:1.4}
+  .scenario button b{display:block;color:var(--accent);margin-bottom:3px}
+
+  .reason-code{font-family:monospace;font-size:11px;padding:2px 6px;
+    background:var(--panel2);border-radius:4px;color:var(--accent)}
+
+  .gauge-wrap{display:flex;gap:20px;justify-content:space-around;
+    align-items:flex-end;height:200px;padding:10px;flex-wrap:wrap}
+  .gauge-col{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .gauge-bar{width:40px;height:160px;background:var(--panel2);border-radius:6px;
+    position:relative;overflow:hidden;border:1px solid var(--line)}
+  .gauge-fill{position:absolute;bottom:0;left:0;right:0;
+    transition:height .4s;opacity:.75}
+  .gauge-sp{position:absolute;left:0;right:0;border-top:2px dashed #fff;
+    font-size:9px;color:#fff;text-align:center}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔥 Boiler Controller <span>HMI</span></h1>
+  <div class="status">
+    <div class="ws-status" id="ws-indicator" title="WebSocket Status"></div>
+    <span class="badge" id="badge-time">--:--:--</span>
+    <span class="badge ok" id="badge-mode">--</span>
+    <span class="badge ok" id="badge-state">--</span>
+    <span class="badge ok" id="badge-safety">--</span>
+    <button class="btn warn" id="btn-master-reset">↺ ریست مرکزی</button>
+    <div class="timescale">
+      <button data-ts="1">×1</button>
+      <button data-ts="10">×10</button>
+      <button data-ts="60" class="active">×60</button>
+      <button data-ts="300">×300</button>
+      <button data-ts="1800">×1800</button>
+    </div>
+  </div>
+</header>
+
+<nav>
+  <button data-page="dashboard" class="active">داشبورد</button>
+  <button data-page="sim" style="color:var(--warn)">🧪 شبیه‌ساز</button>
+  <button data-page="chart">📈 نمودار</button>
+  <button data-page="equipment">تجهیزات</button>
+  <button data-page="alarms">آلارم‌ها</button>
+  <button data-page="schedule">برنامه</button>
+  <button data-page="config">تنظیمات</button>
+  <button data-page="logs">رویدادها</button>
+  <button data-page="scenarios" style="color:var(--purple)">🎬 سناریوها</button>
+</nav>
+
+<main>
+
+<!-- ═══════════════════ DASHBOARD ═══════════════════ -->
+<section class="page active" id="page-dashboard">
+  <div class="reset-banner hidden" id="safety-banner">
+    <span>🚨 سیستم در قفل ایمنی است. علت را رفع کنید یا ریست مرکزی بزنید.</span>
+    <button class="btn warn" onclick="sendCmd({action:'master_reset'})">ریست مرکزی</button>
+  </div>
+
+  <div class="kpi-strip">
+    <div class="kpi"><div class="k">دمای رفت</div>
+      <div class="v" id="d-supply">--<span class="unit">°C</span></div></div>
+    <div class="kpi"><div class="k">Setpoint</div>
+      <div class="v" id="d-setpoint">--<span class="unit">°C</span></div></div>
+    <div class="kpi"><div class="k">Error</div>
+      <div class="v" id="d-error">--<span class="unit">°C</span></div></div>
+    <div class="kpi"><div class="k">Heating Demand</div>
+      <div class="v" id="d-demand">--</div></div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <h3>چرخه State Machine</h3>
+      <div class="flow-diagram" id="flow">
+        <span class="node" data-s="IDLE">IDLE</span><span class="arrow">→</span>
+        <span class="node" data-s="PRECHECK">PRECHECK</span><span class="arrow">→</span>
+        <span class="node" data-s="PUMP_STARTING">PUMP</span><span class="arrow">→</span>
+        <span class="node" data-s="FLOW_WAIT">FLOW</span><span class="arrow">→</span>
+        <span class="node" data-s="HEATING_REQUEST">REQ</span><span class="arrow">→</span>
+        <span class="node" data-s="BURNER_STARTING">IGN</span><span class="arrow">→</span>
+        <span class="node" data-s="HEATING">HEAT</span><span class="arrow">→</span>
+        <span class="node" data-s="BURNER_STOPPING">STOP</span><span class="arrow">→</span>
+        <span class="node" data-s="PUMP_POST_RUN">POST</span>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <span class="k">Reason Code</span>
+        <span class="v"><span class="reason-code" id="d-reason">--</span></span></div>
+      <div class="row"><span class="k">Setpoint Source</span>
+        <span class="v" id="d-setpoint-src">—</span></div>
+      <div class="row"><span class="k">Retry Count</span>
+        <span class="v" id="d-retry">0</span></div>
+    </div>
+
+    <div class="card">
+      <h3>وضعیت تجهیزات</h3>
+      <div class="row"><span class="k"><span class="led off" id="d-pump1-led"></span>پمپ ۱</span>
+        <span class="v" id="d-pump1">OFF</span></div>
+      <div class="row"><span class="k"><span class="led off" id="d-burner1-led"></span>مشعل ۱</span>
+        <span class="v" id="d-burner1">OFF</span></div>
+      <div class="row"><span class="k">Flow Switch</span>
+        <span class="v" id="d-flow">NO</span></div>
+      <div class="row"><span class="k">فیدبک پمپ</span>
+        <span class="v" id="d-pump-fb">OFF</span></div>
+      <div class="row"><span class="k">فیدبک مشعل</span>
+        <span class="v" id="d-burner-fb">OFF</span></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
+    <h3>نمای حرارتی</h3>
+    <div class="gauge-wrap" id="gauge"></div>
+  </div>
+</section>
+
+<!-- ═══════════════════ SIM PANEL ═══════════════════ -->
+<section class="page" id="page-sim">
+  <div class="grid g2">
+    <div class="card">
+      <h3>🌡️ دمای سنسورها
+        <button class="btn ghost tiny" onclick="clearAllSensorOverrides()">همه AUTO</button>
+      </h3>
+      <p class="label" style="margin-bottom:10px">
+        <b>AUTO</b> = فیزیک خودش، <b>MAN</b> = مقدار شما.
+        عدد یا اسلایدر را تغییر دهید.
+      </p>
+      <div id="sim-sliders"></div>
+    </div>
+
+    <div class="card">
+      <h3>⚙️ ورودی‌های دیجیتال
+        <button class="btn ghost tiny" onclick="clearAllDiOverrides()">همه AUTO</button>
+      </h3>
+      <div id="sim-dis"></div>
+
+      <h3 style="margin-top:16px">🔄 فیدبک تجهیزات</h3>
+      <p class="label" style="margin-bottom:8px">
+        برای تست خطا: MAN را فعال کرده و روی ON/OFF بزنید.
+      </p>
+      <div id="sim-fbs"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ CHART ═══════════════════ -->
+<section class="page" id="page-chart">
+  <div class="card">
+    <h3>📈 نمودار دما</h3>
+    <div class="chart"><canvas id="chart-temp"></canvas></div>
+    <div style="display:flex;gap:14px;margin-top:10px;font-size:11px;flex-wrap:wrap">
+      <span><span style="display:inline-block;width:14px;height:3px;background:#ef4444;vertical-align:middle"></span> رفت</span>
+      <span><span style="display:inline-block;width:14px;height:3px;background:#3aa0ff;vertical-align:middle"></span> برگشت</span>
+      <span><span style="display:inline-block;width:14px;height:3px;background:#22c55e;vertical-align:middle"></span> دیگ</span>
+      <span><span style="display:inline-block;width:14px;height:3px;background:#a855f7;vertical-align:middle"></span> بیرون</span>
+      <span><span style="display:inline-block;width:14px;height:3px;background:#f59e0b;vertical-align:middle;border-top:1px dashed"></span> SP</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ EQUIPMENT ═══════════════════ -->
+<section class="page" id="page-equipment">
+  <div class="grid g2">
+    <div class="card">
+      <h3>پمپ‌ها</h3>
+      <table><thead><tr><th>پمپ</th><th>فرمان</th><th>فیدبک</th><th>وضعیت</th>
+        <th>Runtime</th><th>استارت</th><th>Manual</th></tr></thead>
+        <tbody id="tbl-pumps"></tbody></table>
+    </div>
+    <div class="card">
+      <h3>مشعل‌ها</h3>
+      <table><thead><tr><th>مشعل</th><th>فرمان</th><th>فیدبک</th><th>وضعیت</th>
+        <th>Runtime</th><th>استارت</th><th>Manual</th></tr></thead>
+        <tbody id="tbl-burners"></tbody></table>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ ALARMS ═══════════════════ -->
+<section class="page" id="page-alarms">
+  <div class="card">
+    <h3>آلارم‌های فعال (<span id="alarm-count">0</span>)
+      <button class="btn warn tiny" onclick="sendCmd({action:'master_reset'})">ریست همه</button>
+    </h3>
+    <div id="alarm-list"></div>
+  </div>
+  <div class="card" style="margin-top:12px">
+    <h3>تاریخچه</h3>
+    <div id="alarm-history" style="max-height:400px;overflow-y:auto"></div>
+  </div>
+</section>
+
+<!-- ═══════════════════ SCHEDULE ═══════════════════ -->
+<section class="page" id="page-schedule">
+  <div class="card">
+    <h3>برنامه‌های زمانی</h3>
+    <table><thead><tr><th>فعال</th><th>روزها</th><th>شروع</th><th>پایان</th>
+      <th>دمای هدف</th><th>اولویت</th><th></th></tr></thead>
+      <tbody id="tbl-schedule"></tbody></table>
+    <div class="grid g4" style="margin-top:12px">
+      <div class="field"><label>روزها (1-127)</label>
+        <input type="number" id="sch-days" value="127"></div>
+      <div class="field"><label>شروع (دقیقه)</label>
+        <input type="number" id="sch-start" value="360"></div>
+      <div class="field"><label>پایان (دقیقه)</label>
+        <input type="number" id="sch-end" value="1320"></div>
+      <div class="field"><label>دمای هدف °C</label>
+        <input type="number" id="sch-temp" value="65"></div>
+    </div>
+    <button class="btn primary" onclick="addSchedule()">+ افزودن</button>
+  </div>
+</section>
+
+<!-- ═══════════════════ CONFIG ═══════════════════ -->
+<section class="page" id="page-config">
+  <div class="grid g2">
+    <div class="card">
+      <h3>پارامترهای کنترل</h3>
+      <div class="field"><label>Heating Start Hysteresis (°C)</label>
+        <input type="number" id="cfg-hsh" step="0.5"></div>
+      <div class="field"><label>Heating Stop Hysteresis (°C)</label>
+        <input type="number" id="cfg-hsh2" step="0.5"></div>
+      <div class="field"><label>Max Supply Temp (°C)</label>
+        <input type="number" id="cfg-maxsup"></div>
+      <div class="field"><label>Max Boiler Temp (°C)</label>
+        <input type="number" id="cfg-maxbo"></div>
+      <div class="field"><label>Pump Start Delay (s)</label>
+        <input type="number" id="cfg-psd"></div>
+      <div class="field"><label>Flow Confirm (s)</label>
+        <input type="number" id="cfg-fc"></div>
+      <div class="field"><label>Burner Start Delay (s)</label>
+        <input type="number" id="cfg-bsd"></div>
+      <div class="field"><label>Burner Min ON (s)</label>
+        <input type="number" id="cfg-bmon"></div>
+      <div class="field"><label>Burner Min OFF (s)</label>
+        <input type="number" id="cfg-bmoff"></div>
+      <div class="field"><label>Pump Post Run (s)</label>
+        <input type="number" id="cfg-ppr"></div>
+      <div class="field"><label>Min Expected Rise (°C)</label>
+        <input type="number" id="cfg-minrise" step="0.1"></div>
+      <button class="btn primary" onclick="applyConfig()">💾 اعمال</button>
+    </div>
+    <div class="card">
+      <h3>Weather Compensation</h3>
+      <div class="field"><label>فعال</label>
+        <select id="wc-enabled"><option value="true">بله</option><option value="false">خیر</option></select></div>
+      <div class="grid g2">
+        <div class="field"><label>Outdoor Min</label>
+          <input type="number" id="wc-omin"></div>
+        <div class="field"><label>Outdoor Max</label>
+          <input type="number" id="wc-omax"></div>
+        <div class="field"><label>Supply at O.Max</label>
+          <input type="number" id="wc-smax"></div>
+        <div class="field"><label>Supply at O.Min</label>
+          <input type="number" id="wc-smin"></div>
+      </div>
+      <div class="field"><label>Curve Slope</label>
+        <input type="number" id="wc-slope" step="0.1"></div>
+
+      <h3 style="margin-top:14px">حالت و Setpoint</h3>
+      <div class="field"><label>Mode</label>
+        <select id="sel-mode" onchange="sendCmd({action:'set_mode',mode:this.value})">
+          <option value="AUTO">AUTO</option>
+          <option value="MANUAL">MANUAL</option>
+          <option value="OFF">OFF</option>
+          <option value="BOOST">BOOST</option>
+          <option value="VACATION">VACATION</option>
+        </select></div>
+      <div class="field"><label>Manual Setpoint °C</label>
+        <input type="number" id="in-manual-sp"></div>
+      <button class="btn primary" onclick="sendCmd({action:'set_manual_setpoint',temp:parseFloat(document.getElementById('in-manual-sp').value)})">اعمال Setpoint</button>
+      <button class="btn purple" onclick="sendCmd({action:'boost'})">شروع Boost</button>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ LOGS ═══════════════════ -->
+<section class="page" id="page-logs">
+  <div class="card">
+    <h3>رویدادها</h3>
+    <div id="log-list" style="max-height:600px;overflow-y:auto"></div>
+  </div>
+</section>
+
+<!-- ═══════════════════ SCENARIOS ═══════════════════ -->
+<section class="page" id="page-scenarios">
+  <div class="card">
+    <h3>🎬 سناریوها</h3>
+    <div class="scenario">
+      <button class="btn" data-sc="normal"><b>گرمایش عادی</b>چرخه کامل</button>
+      <button class="btn" data-sc="setpoint_reached"><b>رسیدن به SP</b>خاموشی خودکار</button>
+      <button class="btn" data-sc="pump_fail"><b>خرابی پمپ</b>E100</button>
+      <button class="btn" data-sc="flow_fail"><b>عدم جریان</b>E110</button>
+      <button class="btn" data-sc="burner_fail"><b>عدم فیدبک مشعل</b>E200</button>
+      <button class="btn" data-sc="no_response"><b>عدم پاسخ حرارتی</b>E210 + Confidence</button>
+      <button class="btn" data-sc="sensor_stuck"><b>گیرکردن سنسور</b>E030</button>
+      <button class="btn" data-sc="overtemp"><b>دمای بالا</b>E300 + قفل</button>
+      <button class="btn" data-sc="boiler_over"><b>دمای دیگ بالا</b>E301</button>
+      <button class="btn" data-sc="antifreeze"><b>❄️ Anti-Freeze</b>گرمایش اضطراری</button>
+      <button class="btn" data-sc="estop"><b>E-Stop</b>SAFETY_LOCK</button>
+      <button class="btn" data-sc="outdoor_fail"><b>قطع سنسور بیرون</b>Weather Comp OFF</button>
+      <button class="btn" data-sc="sensor_invalid"><b>سنسور نامعتبر</b>E001</button>
+      <button class="btn" data-sc="high_return"><b>برگشت &gt; رفت</b>E020</button>
+    </div>
+    <div class="card" style="margin-top:14px;background:var(--panel2)">
+      <div class="label" id="scenario-status">سناریویی انتخاب نشده است.</div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+"use strict";
+
+// ═══════════════════════════════════════════════════════════════
+// WebSocket Connection
+// ═══════════════════════════════════════════════════════════════
+let ws = null;
+let lastState = null;
+let reconnectTimer = null;
+
+function connectWS(){
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  ws = new WebSocket(`${proto}//${location.host}/ws`);
+
+  ws.onopen = () => {
+    document.getElementById("ws-indicator").classList.add("connected");
+    console.log("WS connected");
+  };
+  ws.onclose = () => {
+    document.getElementById("ws-indicator").classList.remove("connected");
+    console.log("WS disconnected, reconnecting...");
+    clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(connectWS, 2000);
+  };
+  ws.onerror = (e) => console.error("WS error", e);
+  ws.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === "state"){
+        lastState = msg.data;
+        render(lastState);
+      }
+    } catch(err){ console.error(err); }
+  };
+}
+
+function sendCmd(cmd){
+  if (ws && ws.readyState === WebSocket.OPEN){
+    ws.send(JSON.stringify(cmd));
+  } else {
+    console.warn("WS not connected, cmd dropped:", cmd);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Helpers
+// ═══════════════════════════════════════════════════════════════
+const $ = id => document.getElementById(id);
+const fmt = (v, d=1) => (v==null || isNaN(v)) ? "—" : Number(v).toFixed(d);
+const pad = n => n<10 ? "0"+n : ""+n;
+
+function rtStr(ms){
+  if (!ms) return "0h 0m";
+  const s = Math.floor(ms/1000);
+  return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
+}
+
+function severityClass(sev){
+  return {INFO:"", WARNING:"warn", FAULT:"fault", CRITICAL:"crit", SAFETY:"purple"}[sev] || "";
+}
+
+function modeClass(mode){
+  return {AUTO:"ok", MANUAL:"warn", OFF:"fault", BOOST:"purple",
+    VACATION:"purple", SERVICE:"warn"}[mode] || "warn";
+}
+
+function stateClass(state){
+  if (state === "FAULT" || state === "LOCKOUT") return "fault";
+  if (state === "SAFETY_LOCK") return "crit";
+  if (state === "HEATING") return "ok";
+  if (state === "IDLE" || state === "OFF") return "ok";
+  return "warn";
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Render
+// ═══════════════════════════════════════════════════════════════
+function render(s){
+  // Header
+  const sec = Math.floor(s.sim_time_ms / 1000);
+  $("badge-time").textContent =
+    `⏱ ${pad(Math.floor(sec/3600)%24)}:${pad(Math.floor(sec/60)%60)}:${pad(sec%60)} ×${s.time_scale}`;
+  $("badge-mode").textContent = s.mode;
+  $("badge-mode").className = "badge " + modeClass(s.mode);
+  $("badge-state").textContent = s.state;
+  $("badge-state").className = "badge " + stateClass(s.state);
+  $("badge-safety").textContent = s.safety_locked ? "LOCKED" : "SAFE";
+  $("badge-safety").className = "badge " + (s.safety_locked ? "crit" : "ok");
+
+  // Timescale active
+  document.querySelectorAll(".timescale button").forEach(b=>{
+    b.classList.toggle("active", parseFloat(b.dataset.ts) === s.time_scale);
+  });
+
+  // Banner
+  $("safety-banner").classList.toggle("hidden", !s.safety_locked);
+
+  // Dashboard KPIs
+  $("d-supply").innerHTML = fmt(s.temperatures.supply) + '<span class="unit">°C</span>';
+  $("d-setpoint").innerHTML = fmt(s.setpoint) + '<span class="unit">°C</span>';
+  $("d-error").innerHTML = fmt(s.error, 2) + '<span class="unit">°C</span>';
+  $("d-error").style.color = s.error > 3 ? "var(--ok)" :
+    s.error <= 0 ? "var(--fault)" : "var(--warn)";
+  $("d-demand").textContent = s.heating_demand ? "ON" : "OFF";
+  $("d-demand").style.color = s.heating_demand ? "var(--ok)" : "var(--muted)";
+  $("d-reason").textContent = s.reason_code;
+  $("d-setpoint-src").textContent = s.setpoint_src || "—";
+  $("d-retry").textContent = s.retry_count;
+
+  // Equipment
+  $("d-pump1").textContent = s.pump1_on ? "ON" : "OFF";
+  $("d-pump1-led").className = "led " + (s.pump1_on ? "on" : "off");
+  $("d-burner1").textContent = s.burner1_on ? "ON" : "OFF";
+  $("d-burner1-led").className = "led " + (s.burner1_on ? "on" : "off");
+  $("d-flow").textContent = s.flow_ok ? "OK" : "NO";
+  $("d-flow").style.color = s.flow_ok ? "var(--ok)" : "var(--fault)";
+
+  const fb_pump = s.di_states["1"] ? s.di_states["1"].value : false;
+  const fb_burner = s.di_states["3"] ? s.di_states["3"].value : false;
+  $("d-pump-fb").textContent = fb_pump ? "ON" : "OFF";
+  $("d-pump-fb").style.color = fb_pump ? "var(--ok)" : "var(--muted)";
+  $("d-burner-fb").textContent = fb_burner ? "ON" : "OFF";
+  $("d-burner-fb").style.color = fb_burner ? "var(--ok)" : "var(--muted)";
+
+  // Flow diagram
+  document.querySelectorAll("#flow .node").forEach(n=>{
+    n.classList.toggle("active", n.dataset.s === s.state);
+  });
+
+  renderGauge(s);
+
+  // Page-specific (lazy)
+  const activePage = document.querySelector(".page.active")?.id;
+  if (activePage === "page-sim") renderSimPanel(s);
+  if (activePage === "page-chart") drawChart();
+  if (activePage === "page-equipment") renderEquipment(s);
+  if (activePage === "page-alarms") renderAlarms(s);
+  if (activePage === "page-schedule") renderSchedule(s);
+  if (activePage === "page-logs") renderLogs(s);
+  if (activePage === "page-config") renderConfig(s);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Gauge
+// ═══════════════════════════════════════════════════════════════
+function renderGauge(s){
+  const gauges = [
+    {name:"رفت", val:s.temperatures.supply, min:0, max:120, sp:s.setpoint, color:"#ef4444"},
+    {name:"برگشت", val:s.temperatures.return, min:0, max:120, color:"#3aa0ff"},
+    {name:"دیگ", val:s.temperatures.boiler, min:0, max:120, color:"#22c55e"},
+    {name:"بیرون", val:s.temperatures.outdoor, min:-20, max:40, color:"#a855f7"},
+  ];
+  $("gauge").innerHTML = gauges.map(x=>{
+    const range = x.max - x.min;
+    const v = Math.max(0, Math.min(range, ((isNaN(x.val)?0:x.val) - x.min)));
+    const h = (v / range) * 150;
+    const spH = x.sp != null ? ((x.sp - x.min) / range) * 150 : null;
+    return `<div class="gauge-col">
+      <div style="font-size:14px;font-weight:700;color:${x.color}">${fmt(x.val)}°C</div>
+      <div class="gauge-bar">
+        <div class="gauge-fill" style="height:${h}px;background:${x.color}"></div>
+        ${spH != null ? `<div class="gauge-sp" style="bottom:${spH}px">SP</div>` : ""}
+      </div>
+      <div style="font-size:11px;color:var(--muted)">${x.name}</div>
+    </div>`;
+  }).join("");
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SIM PANEL
+// ═══════════════════════════════════════════════════════════════
+function renderSimPanel(s){
+  // Sensors
+  const sensorOrder = [1,2,3,4,5,6,7,8];
+  const ranges = {
+    1:[0,120], 2:[0,120], 3:[-20,40], 4:[0,80],
+    5:[0,120], 6:[0,120], 7:[0,120], 8:[0,120]
+  };
+  $("sim-sliders").innerHTML = sensorOrder.map(id=>{
+    const sensor = s.sensors[id];
+    if (!sensor) return "";
+    const [mn, mx] = ranges[id] || [0,120];
+    const val = sensor.raw;
+    return `<div class="input-row">
+      <span class="name">
+        <button class="btn tiny ghost"
+          onclick="toggleSensorAuto(${id})"
+          title="Toggle manual/auto">
+          AUTO
+        </button>
+        ${sensor.name}
+      </span>
+      <input type="number" min="${mn}" max="${mx}" step="0.5"
+        value="${fmt(val)}"
+        onchange="setSensorValue(${id}, this.value)">
+      <input type="range" min="${mn}" max="${mx}" step="0.5"
+        value="${Math.max(mn, Math.min(mx, val))}"
+        oninput="setSensorValue(${id}, this.value, true)">
+      <span class="num">${fmt(val)}°C</span>
+    </div>`;
+  }).join("");
+
+  // DI
+  const diOrder = [8,14,15,10,6,7,9,12,13,16];
+  const diNames = {
+    1:"PUMP1_FB", 2:"PUMP2_FB", 3:"BURNER1_FB", 4:"BURNER2_FB",
+    5:"FLOW_SWITCH", 6:"LOW_WATER", 7:"HIGH_PRESSURE",
+    8:"EMERGENCY_STOP", 9:"BURNER_FAULT", 10:"BOILER_SAFETY",
+    11:"FLAME_FB", 12:"DOOR_SAFETY", 13:"EXTERNAL_ENABLE",
+    14:"FIRE_ALARM", 15:"GAS_SAFETY", 16:"RESERVE"
+  };
+  const critical = [8,14,15,10,6,7];
+  $("sim-dis").innerHTML = diOrder.map(id=>{
+    const d = s.di_states[id];
+    if (!d) return "";
+    const v = d.value;
+    const isCrit = critical.includes(id);
+    return `<div class="row">
+      <span class="k" style="color:${isCrit?'var(--fault)':'var(--txt)'}">
+        ${diNames[id]}
+      </span>
+      <span class="v">
+        <button class="btn ${v?'danger':'ghost'} tiny"
+          onclick="sendCmd({action:'set_di',id:${id},value:${!v}})">
+          ${v?'ACTIVE':'INACTIVE'}
+        </button>
+        ${d.manual ? `<button class="btn ghost tiny" onclick="sendCmd({action:'clear_di_override',id:${id}})" title="AUTO">↺</button>` : ""}
+      </span>
+    </div>`;
+  }).join("");
+
+  // Feedbacks
+  const fbs = [
+    {id:1, name:"فیدبک پمپ ۱"},
+    {id:2, name:"فیدبک پمپ ۲"},
+    {id:3, name:"فیدبک مشعل ۱"},
+    {id:4, name:"فیدبک مشعل ۲"},
+    {id:5, name:"Flow Switch"},
+  ];
+  $("sim-fbs").innerHTML = fbs.map(f=>{
+    const d = s.di_states[f.id];
+    if (!d) return "";
+    const isMan = d.manual;
+    const cur = d.value;
+    return `<div class="row">
+      <span class="k">
+        <button class="btn tiny ${isMan?'warn':'ghost'}"
+          onclick="toggleFBOverride(${f.id}, ${isMan})">
+          ${isMan ? "MAN" : "AUTO"}
+        </button>
+        ${f.name}
+      </span>
+      <span class="v">
+        <div class="fb-group">
+          <div class="pill ${cur?'active':'off'}"
+            onclick="sendCmd({action:'set_di',id:${f.id},value:true})">ON</div>
+          <div class="pill ${!cur?'active off':''}"
+            onclick="sendCmd({action:'set_di',id:${f.id},value:false})">OFF</div>
+        </div>
+      </span>
+    </div>`;
+  }).join("");
+}
+
+function toggleSensorAuto(id){
+  sendCmd({action:'set_sensor', id:id, manual:true, value: 50});
+}
+function setSensorValue(id, val, silent){
+  sendCmd({action:'set_sensor', id:id, manual:true, value: parseFloat(val)});
+}
+function clearAllSensorOverrides(){
+  for (let id = 1; id <= 8; id++)
+    sendCmd({action:'clear_sensor_override', id:id});
+}
+function clearAllDiOverrides(){
+  for (let id = 1; id <= 16; id++)
+    sendCmd({action:'clear_di_override', id:id});
+}
+function toggleFBOverride(id, currentlyManual){
+  if (currentlyManual)
+    sendCmd({action:'clear_di_override', id:id});
+  else
+    sendCmd({action:'set_di', id:id, value:false});
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EQUIPMENT TABLE
+// ═══════════════════════════════════════════════════════════════
+function renderEquipment(s){
+  const pumps = [
+    {id:1, name:"پمپ ۱"},
+    {id:2, name:"پمپ ۲"},
+  ];
+  $("tbl-pumps").innerHTML = pumps.map(p=>{
+    const a = s.actuators[p.id];
+    if (!a) return "";
+    return `<tr>
+      <td>${p.name}</td>
+      <td>${a.command?'ON':'OFF'}</td>
+      <td>${a.feedback?'ON':'OFF'}</td>
+      <td><span class="state-pill ${a.state==='ON'?'running':'waiting'}">${a.state}</span></td>
+      <td>${rtStr(a.runtime_ms)}</td>
+      <td>${a.start_count}</td>
+      <td>
+        <button class="btn tiny ${a.manual===true?'primary':''}"
+          onclick="sendCmd({action:'set_actuator_manual',id:${p.id},value:true})">ON</button>
+        <button class="btn tiny ${a.manual===false?'danger':''}"
+          onclick="sendCmd({action:'set_actuator_manual',id:${p.id},value:false})">OFF</button>
+        <button class="btn tiny ${a.manual===null?'ok':''}"
+          onclick="sendCmd({action:'set_actuator_manual',id:${p.id},value:null})">AUTO</button>
+      </td>
+    </tr>`;
+  }).join("");
+
+  const burners = [
+    {id:3, name:"مشعل ۱"},
+    {id:4, name:"مشعل ۲"},
+  ];
+  $("tbl-burners").innerHTML = burners.map(b=>{
+    const a = s.actuators[b.id];
+    if (!a) return "";
+    return `<tr>
+      <td>${b.name}</td>
+      <td>${a.command?'ON':'OFF'}</td>
+      <td>${a.feedback?'ON':'OFF'}</td>
+      <td><span class="state-pill ${a.state==='ON'?'running':'waiting'}">${a.state}</span></td>
+      <td>${rtStr(a.runtime_ms)}</td>
+      <td>${a.start_count}</td>
+      <td>
+        <button class="btn tiny ${a.manual===true?'primary':''}"
+          onclick="sendCmd({action:'set_actuator_manual',id:${b.id},value:true})">ON</button>
+        <button class="btn tiny ${a.manual===false?'danger':''}"
+          onclick="sendCmd({action:'set_actuator_manual',id:${b.id},value:false})">OFF</button>
+        <button class="btn tiny ${a.manual===null?'ok':''}"
+          onclick="sendCmd({action:'set_actuator_manual',id:${b.id},value:null})">AUTO</button>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ALARMS
+// ═══════════════════════════════════════════════════════════════
+function renderAlarms(s){
+  $("alarm-count").textContent = s.alarms.length;
+  if (!s.alarms.length){
+    $("alarm-list").innerHTML = '<p class="label">هیچ آلارم فعالی نیست. ✅</p>';
+  } else {
+    $("alarm-list").innerHTML = s.alarms.map(a=>`
+      <div class="alarm ${a.severity}">
+        <div class="t">
+          <span>[${a.code}] ${a.title}</span>
+          <span class="badge ${severityClass(a.severity)}">${a.severity}</span>
+        </div>
+        <div class="d">${a.description}</div>
+        <div class="r">💡 ${a.recommendation}</div>
+        ${a.confidence > 0 ?
+          `<div class="conf">Confidence: ${a.confidence.toFixed(0)}% — ${a.reason_code}</div>` : ""}
+        <div style="display:flex;gap:4px;margin-top:6px">
+          <button class="btn ghost tiny"
+            onclick="sendCmd({action:'ack_alarm',code:'${a.code}'})">تأیید</button>
+          <button class="btn warn tiny"
+            onclick="sendCmd({action:'clear_alarm',code:'${a.code}'})">پاک کردن</button>
+        </div>
+      </div>`).join("");
+  }
+  $("alarm-history").innerHTML = s.alarm_history.slice(0,80).map(a=>`
+    <div class="alarm ${a.severity}" style="opacity:.6">
+      <div class="t">
+        <span>[${a.code}] ${a.title}</span>
+        <span class="label">${(a.timestamp_ms/1000).toFixed(0)}s</span>
+      </div>
+    </div>`).join("") || '<p class="label">تاریخچه خالی است.</p>';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SCHEDULE
+// ═══════════════════════════════════════════════════════════════
+function renderSchedule(s){
+  $("tbl-schedule").innerHTML = s.schedule.map((e,i)=>{
+    const days = [];
+    for (let d=0; d<7; d++) if (e.days_mask & (1<<d)) days.push(["ش","ی","د","س","چ","پ","ج"][d]);
+    return `<tr>
+      <td>${e.enabled?"✅":"❌"}</td>
+      <td>${days.join(" ")}</td>
+      <td>${pad(Math.floor(e.start_minutes/60))}:${pad(e.start_minutes%60)}</td>
+      <td>${pad(Math.floor(e.end_minutes/60))}:${pad(e.end_minutes%60)}</td>
+      <td>${e.target_temp}°C</td>
+      <td>${e.priority}</td>
+      <td><button class="btn ghost tiny"
+        onclick="sendCmd({action:'remove_schedule',index:${i}})">✕</button></td>
+    </tr>`;
+  }).join("");
+}
+
+function addSchedule(){
+  sendCmd({
+    action: "add_schedule",
+    days_mask: parseInt($("sch-days").value) || 127,
+    start_minutes: parseInt($("sch-start").value) || 0,
+    end_minutes: parseInt($("sch-end").value) || 1440,
+    target_temp: parseFloat($("sch-temp").value) || 65,
+    priority: 1,
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOGS
+// ═══════════════════════════════════════════════════════════════
+function renderLogs(s){
+  $("log-list").innerHTML = s.logs.slice(0,200).map(l=>`
+    <div class="log-entry">
+      <span class="ts">[${(l.ts/1000).toFixed(1)}s]</span>
+      <b>${l.code}</b> — ${l.desc}
+    </div>`).join("") || '<p class="label">رویدادی ثبت نشده.</p>';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════════
+let configLoaded = false;
+function renderConfig(s){
+  if (configLoaded) return; // فقط یکبار
+  configLoaded = true;
+  const c = s.config;
+  $("cfg-hsh").value = c.heating_start_hyst;
+  $("cfg-hsh2").value = c.heating_stop_hyst;
+  $("cfg-maxsup").value = c.max_supply_temp;
+  $("cfg-maxbo").value = c.max_boiler_temp;
+  $("cfg-psd").value = c.pump_start_delay_ms/1000;
+  $("cfg-fc").value = c.flow_confirm_ms/1000;
+  $("cfg-bsd").value = c.burner_start_delay_ms/1000;
+  $("cfg-bmon").value = c.burner_min_on_ms/1000;
+  $("cfg-bmoff").value = c.burner_min_off_ms/1000;
+  $("cfg-ppr").value = c.pump_post_run_ms/1000;
+  $("cfg-minrise").value = c.min_expected_rise;
+  $("wc-enabled").value = c.wc_enabled ? "true" : "false";
+  $("wc-omin").value = c.outdoor_min;
+  $("wc-omax").value = c.outdoor_max;
+  $("wc-smax").value = c.supply_max;
+  $("wc-smin").value = c.supply_min;
+  $("wc-slope").value = c.curve_slope;
+}
+function applyConfig(){
+  const updates = {
+    heating_start_hyst: parseFloat($("cfg-hsh").value),
+    heating_stop_hyst: parseFloat($("cfg-hsh2").value),
+    max_supply_temp: parseFloat($("cfg-maxsup").value),
+    max_boiler_temp: parseFloat($("cfg-maxbo").value),
+    pump_start_delay_ms: parseFloat($("cfg-psd").value)*1000,
+    flow_confirm_ms: parseFloat($("cfg-fc").value)*1000,
+    burner_start_delay_ms: parseFloat($("cfg-bsd").value)*1000,
+    burner_min_on_ms: parseFloat($("cfg-bmon").value)*1000,
+    burner_min_off_ms: parseFloat($("cfg-bmoff").value)*1000,
+    pump_post_run_ms: parseFloat($("cfg-ppr").value)*1000,
+    min_expected_rise: parseFloat($("cfg-minrise").value),
+    wc_enabled: $("wc-enabled").value === "true",
+    outdoor_min: parseFloat($("wc-omin").value),
+    outdoor_max: parseFloat($("wc-omax").value),
+    supply_max: parseFloat($("wc-smax").value),
+    supply_min: parseFloat($("wc-smin").value),
+    curve_slope: parseFloat($("wc-slope").value),
+  };
+  for (const [key, value] of Object.entries(updates)){
+    sendCmd({action:"update_config", key, value});
+  }
+  alert("✅ تنظیمات اعمال شد.");
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CHART
+// ═══════════════════════════════════════════════════════════════
+let chartData = [];
+let lastChartFetch = 0;
+async function fetchHistory(){
+  try {
+    const r = await fetch("/api/history");
+    chartData = await r.json();
+  } catch(e){ /* ignore */ }
+}
+function drawChart(){
+  const now = Date.now();
+  if (now - lastChartFetch > 500){
+    lastChartFetch = now;
+    fetchHistory();
+  }
+  const canvas = $("chart-temp");
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const g = canvas.getContext("2d");
+  g.setTransform(dpr,0,0,dpr,0,0);
+  const W = rect.width, H = rect.height;
+  g.clearRect(0,0,W,H);
+
+  if (chartData.length < 2) return;
+  const series = [
+    {k:"supply", c:"#ef4444", dash:false},
+    {k:"return", c:"#3aa0ff", dash:false},
+    {k:"boiler", c:"#22c55e", dash:false},
+    {k:"outdoor", c:"#a855f7", dash:false},
+    {k:"setpoint", c:"#f59e0b", dash:true},
+  ];
+  const all = [];
+  for (const s of series)
+    for (const p of chartData)
+      if (p[s.k] != null && !isNaN(p[s.k])) all.push(p[s.k]);
+  if (!all.length) return;
+  const vmin = Math.min(...all, 0);
+  const vmax = Math.max(...all, 100);
+  const pad = 30, plotW = W-pad*2, plotH = H-pad*2;
+
+  g.strokeStyle = "#2b3b4d"; g.lineWidth = 1;
+  for (let i=0; i<=5; i++){
+    const y = pad + (plotH/5)*i;
+    g.beginPath(); g.moveTo(pad, y); g.lineTo(W-pad, y); g.stroke();
+    g.fillStyle = "#8ba1b6"; g.font = "10px Tahoma";
+    g.fillText(Math.round(vmax - ((vmax-vmin)/5)*i)+"°", 2, y+3);
+  }
+
+  const t0 = chartData[0].t;
+  const t1 = chartData[chartData.length-1].t;
+  const tRange = Math.max(1, t1 - t0);
+
+  for (const s of series){
+    g.strokeStyle = s.c; g.lineWidth = 1.8;
+    g.setLineDash(s.dash ? [5,5] : []);
+    g.beginPath();
+    let started = false;
+    for (const p of chartData){
+      const v = p[s.k];
+      if (v == null || isNaN(v)){ started = false; continue; }
+      const x = pad + ((p.t - t0)/tRange)*plotW;
+      const y = pad + plotH - ((v - vmin)/(vmax - vmin))*plotH;
+      if (!started){ g.moveTo(x, y); started = true; }
+      else g.lineTo(x, y);
+    }
+    g.stroke();
+    g.setLineDash([]);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════════════
+document.querySelectorAll("nav button").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));
+    document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");
+    $("page-"+b.dataset.page).classList.add("active");
+    if (lastState) render(lastState);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// TIMESCALE
+// ═══════════════════════════════════════════════════════════════
+document.querySelectorAll(".timescale button").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    sendCmd({action:"set_time_scale", scale: parseFloat(b.dataset.ts)});
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// MASTER RESET
+// ═══════════════════════════════════════════════════════════════
+$("btn-master-reset").addEventListener("click", ()=>{
+  sendCmd({action:"master_reset"});
+});
+
+// ═══════════════════════════════════════════════════════════════
+// SCENARIOS
+// ═══════════════════════════════════════════════════════════════
+document.querySelectorAll("[data-sc]").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    const name = b.dataset.sc;
+    sendCmd({action:"scenario", name});
+    $("scenario-status").innerHTML = `<b>سناریو:</b> ${b.querySelector('b').textContent} — اجرا شد`;
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════════
+connectWS();
+// Chart animation loop
+setInterval(()=>{
+  if (document.querySelector(".page.active")?.id === "page-chart") drawChart();
+}, 500);
+</script>
+</body>
+</html>

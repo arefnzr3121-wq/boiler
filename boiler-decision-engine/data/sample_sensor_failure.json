@@ -1,0 +1,33 @@
+{
+  "timestamp": "2026-10-04T08:40:00+00:00",
+  "sensors": [
+    {
+      "sensor_id": "indoor_temperature",
+      "sensor_type": "ds18b20",
+      "value": 19.6,
+      "unit": "°C",
+      "status": "offline"
+    },
+    {
+      "sensor_id": "outdoor_temperature",
+      "sensor_type": "ds18b20",
+      "value": 8.5,
+      "unit": "°C",
+      "status": "ok"
+    },
+    {
+      "sensor_id": "boiler_temperature",
+      "sensor_type": "ds18b20",
+      "value": 58.2,
+      "unit": "°C",
+      "status": "ok"
+    },
+    {
+      "sensor_id": "gas_sensor",
+      "sensor_type": "mq2",
+      "value": 310,
+      "unit": "raw",
+      "status": "ok"
+    }
+  ]
+}

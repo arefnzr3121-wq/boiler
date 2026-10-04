@@ -1,0 +1,1676 @@
+﻿<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Boiler Decision Engine — Super Admin</title>
+
+<style>
+:root{
+    --bg:#0b1220;
+    --panel:#111827;
+    --panel2:#172033;
+    --border:#26344d;
+    --text:#e5e7eb;
+    --muted:#94a3b8;
+    --green:#22c55e;
+    --red:#ef4444;
+    --yellow:#f59e0b;
+    --blue:#3b82f6;
+    --cyan:#06b6d4;
+    --purple:#8b5cf6;
+}
+
+*{
+    box-sizing:border-box;
+}
+
+body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:
+        "Segoe UI",
+        Tahoma,
+        Arial,
+        sans-serif;
+}
+
+header{
+    position:sticky;
+    top:0;
+    z-index:100;
+    background:#0f172a;
+    border-bottom:1px solid var(--border);
+    padding:16px 22px;
+}
+
+.header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:20px;
+}
+
+.title{
+    font-size:22px;
+    font-weight:800;
+}
+
+.subtitle{
+    color:var(--muted);
+    font-size:12px;
+    margin-top:4px;
+}
+
+.status{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:13px;
+}
+
+.dot{
+    width:11px;
+    height:11px;
+    border-radius:50%;
+    background:var(--red);
+}
+
+.dot.ok{
+    background:var(--green);
+    box-shadow:0 0 10px var(--green);
+}
+
+.container{
+    padding:20px;
+    max-width:1800px;
+    margin:auto;
+}
+
+.grid{
+    display:grid;
+    grid-template-columns:
+        repeat(auto-fit,minmax(330px,1fr));
+    gap:16px;
+}
+
+.card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:16px;
+    box-shadow:0 10px 30px rgba(0,0,0,.15);
+}
+
+.card h2{
+    margin:0 0 14px;
+    font-size:16px;
+}
+
+.card h3{
+    font-size:13px;
+    color:var(--muted);
+    margin:18px 0 10px;
+}
+
+.row{
+    display:grid;
+    grid-template-columns:1fr 120px;
+    gap:10px;
+    align-items:center;
+    margin-bottom:12px;
+}
+
+.label{
+    font-size:13px;
+}
+
+.unit{
+    color:var(--muted);
+    font-size:11px;
+}
+
+input[type=number],
+input[type=text],
+input[type=url],
+select{
+    width:100%;
+    background:#0b1220;
+    border:1px solid var(--border);
+    color:var(--text);
+    border-radius:8px;
+    padding:9px 10px;
+    outline:none;
+}
+
+input:focus,
+select:focus{
+    border-color:var(--blue);
+}
+
+.slider{
+    display:grid;
+    grid-template-columns:1fr 90px;
+    gap:10px;
+    align-items:center;
+}
+
+input[type=range]{
+    width:100%;
+    accent-color:var(--cyan);
+}
+
+.switch{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:10px;
+    background:#0b1220;
+    border:1px solid var(--border);
+    border-radius:9px;
+    margin-bottom:9px;
+}
+
+.switch input{
+    width:20px;
+    height:20px;
+}
+
+.buttons{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:8px;
+}
+
+button{
+    border:0;
+    border-radius:9px;
+    padding:11px 10px;
+    color:white;
+    background:#334155;
+    cursor:pointer;
+    font-weight:700;
+}
+
+button:hover{
+    filter:brightness(1.15);
+}
+
+.btn-green{background:#15803d}
+.btn-red{background:#b91c1c}
+.btn-yellow{background:#b45309}
+.btn-blue{background:#1d4ed8}
+.btn-purple{background:#6d28d9}
+.btn-cyan{background:#0e7490}
+
+.mode{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+}
+
+.mode button.active{
+    outline:2px solid white;
+}
+
+.big-state{
+    text-align:center;
+    padding:18px;
+    border-radius:12px;
+    background:#0b1220;
+    border:1px solid var(--border);
+    margin-bottom:10px;
+}
+
+.big-state .value{
+    font-size:28px;
+    font-weight:900;
+}
+
+.ON{
+    color:var(--green);
+}
+
+.OFF{
+    color:var(--muted);
+}
+
+.SAFETY_OFF{
+    color:var(--red);
+}
+
+.UNKNOWN{
+    color:var(--yellow);
+}
+
+.actuators{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:8px;
+}
+
+.actuator{
+    background:#0b1220;
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:14px 8px;
+    text-align:center;
+}
+
+.actuator-name{
+    font-size:11px;
+    color:var(--muted);
+}
+
+.actuator-value{
+    margin-top:6px;
+    font-size:18px;
+    font-weight:900;
+}
+
+.error-list{
+    max-height:260px;
+    overflow:auto;
+}
+
+.error{
+    padding:10px;
+    border-radius:8px;
+    margin-bottom:7px;
+    background:#241018;
+    border-right:4px solid var(--red);
+    font-size:12px;
+}
+
+.warning{
+    background:#241d0b;
+    border-right-color:var(--yellow);
+}
+
+.success{
+    background:#0b2115;
+    border-right-color:var(--green);
+}
+
+.log{
+    height:260px;
+    overflow:auto;
+    background:#050a12;
+    border-radius:9px;
+    border:1px solid var(--border);
+    padding:10px;
+    direction:ltr;
+    text-align:left;
+    font-family:Consolas,monospace;
+    font-size:11px;
+    white-space:pre-wrap;
+}
+
+pre{
+    margin:0;
+    white-space:pre-wrap;
+    word-break:break-word;
+}
+
+.badge{
+    display:inline-block;
+    padding:5px 9px;
+    border-radius:999px;
+    background:#26344d;
+    font-size:11px;
+}
+
+footer{
+    text-align:center;
+    color:var(--muted);
+    padding:25px;
+    font-size:11px;
+}
+
+.full{
+    grid-column:1/-1;
+}
+
+@media(max-width:800px){
+    .row{
+        grid-template-columns:1fr;
+    }
+
+    .buttons{
+        grid-template-columns:1fr 1fr;
+    }
+
+    .header{
+        flex-direction:column;
+        align-items:flex-start;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+
+<div class="header">
+
+<div>
+<div class="title">
+🔥 Boiler Decision Engine — SUPER ADMIN
+</div>
+
+<div class="subtitle">
+Mechanical / Energy Commissioning & Decision Control Panel
+</div>
+</div>
+
+<div class="status">
+<div id="apiDot" class="dot"></div>
+<span id="apiStatus">API OFFLINE</span>
+</div>
+
+</div>
+
+</header>
+
+
+<div class="container">
+
+<div class="grid">
+
+
+<!-- API -->
+
+<div class="card">
+
+<h2>⚙️ اتصال سیستم</h2>
+
+<div class="row">
+<div class="label">API URL</div>
+<input id="apiUrl"
+type="url"
+value="http://127.0.0.1:8000">
+</div>
+
+<div class="buttons">
+
+<button class="btn-blue" onclick="health()">
+Health
+</button>
+
+<button class="btn-cyan" onclick="getState()">
+State
+</button>
+
+<button onclick="clearLog()">
+Clear Log
+</button>
+
+<button onclick="sendEvaluation()">
+Evaluate
+</button>
+
+</div>
+
+</div>
+
+
+<!-- MODE -->
+
+<div class="card">
+
+<h2>🎛 حالت کنترل</h2>
+
+<div class="mode">
+
+<button
+id="autoBtn"
+class="btn-blue active"
+onclick="setMode('AUTO')">
+AUTO
+</button>
+
+<button
+id="manualBtn"
+onclick="setMode('MANUAL')">
+MANUAL
+</button>
+
+</div>
+
+<div style="margin-top:15px">
+حالت فعلی:
+<span id="modeBadge" class="badge">AUTO</span>
+</div>
+
+<h3>فرمان اصلی</h3>
+
+<div class="buttons">
+
+<button class="btn-green"
+onclick="sendAction('RUN')">
+START / RUN
+</button>
+
+<button class="btn-red"
+onclick="sendAction('STOP')">
+STOP
+</button>
+
+<button class="btn-yellow"
+onclick="sendAction('SAFETY')">
+SAFETY
+</button>
+
+<button class="btn-purple"
+onclick="resetSafety()">
+RESET SAFETY
+</button>
+
+</div>
+
+</div>
+
+
+<!-- TEMPERATURES -->
+
+<div class="card">
+
+<h2>🌡 ورودی‌های دمایی</h2>
+
+<div class="row">
+<div>
+<div class="label">دمای محیط / داخل</div>
+<div class="unit">DS18B20 — °C</div>
+</div>
+
+<div class="slider">
+<input id="indoorRange"
+type="range"
+min="-20"
+max="60"
+step="0.1"
+value="18"
+oninput="sync('indoor')">
+
+<input id="indoor"
+type="number"
+step="0.1"
+value="18"
+oninput="sync('indoor')">
+</div>
+</div>
+
+
+<div class="row">
+<div>
+<div class="label">دمای بیرون</div>
+<div class="unit">DS18B20 — °C</div>
+</div>
+
+<div class="slider">
+<input id="outdoorRange"
+type="range"
+min="-30"
+max="60"
+step="0.1"
+value="8"
+oninput="sync('outdoor')">
+
+<input id="outdoor"
+type="number"
+step="0.1"
+value="8"
+oninput="sync('outdoor')">
+</div>
+</div>
+
+
+<div class="row">
+<div>
+<div class="label">دمای دیگ</div>
+<div class="unit">Boiler — °C</div>
+</div>
+
+<div class="slider">
+<input id="boilerRange"
+type="range"
+min="0"
+max="130"
+step="0.1"
+value="60"
+oninput="sync('boiler')">
+
+<input id="boiler"
+type="number"
+step="0.1"
+value="60"
+oninput="sync('boiler')">
+</div>
+</div>
+
+
+<div class="row">
+<div>
+<div class="label">دمای کلکتور</div>
+<div class="unit">Collector — °C</div>
+</div>
+
+<div class="slider">
+<input id="collectorRange"
+type="range"
+min="-20"
+max="180"
+step="0.1"
+value="40"
+oninput="sync('collector')">
+
+<input id="collector"
+type="number"
+step="0.1"
+value="40"
+oninput="sync('collector')">
+</div>
+</div>
+
+
+<div class="row">
+<div>
+<div class="label">دمای آب گرم مصرفی</div>
+<div class="unit">DHW — °C</div>
+</div>
+
+<div class="slider">
+<input id="dhwRange"
+type="range"
+min="0"
+max="100"
+step="0.1"
+value="45"
+oninput="sync('dhw')">
+
+<input id="dhw"
+type="number"
+step="0.1"
+value="45"
+oninput="sync('dhw')">
+</div>
+</div>
+
+</div>
+
+
+<!-- TARGET / LIMITS -->
+
+<div class="card">
+
+<h2>🎯 Setpoint / Limits</h2>
+
+<div class="row">
+<div>
+<div class="label">دمای Target</div>
+<div class="unit">Comfort Target — °C</div>
+</div>
+
+<input
+id="target"
+type="number"
+step="0.1"
+value="21">
+</div>
+
+
+<div class="row">
+<div>
+<div class="label">Offset</div>
+<div class="unit">°C</div>
+</div>
+
+<input
+id="offset"
+type="number"
+step="0.1"
+value="0">
+</div>
+
+
+<div class="row">
+<div>
+<div class="label">حداقل دمای محیط</div>
+<div class="unit">Outdoor Minimum — °C</div>
+</div>
+
+<input
+id="minOutdoor"
+type="number"
+step="0.1"
+value="-10">
+</div>
+
+
+<div class="row">
+<div>
+<div class="label">حداکثر دمای دیگ</div>
+<div class="unit">Boiler Maximum — °C</div>
+</div>
+
+<input
+id="maxBoiler"
+type="number"
+step="0.1"
+value="95">
+</div>
+
+
+<div class="row">
+<div>
+<div class="label">حداقل دمای دیگ</div>
+<div class="unit">Boiler Minimum — °C</div>
+</div>
+
+<input
+id="minBoiler"
+type="number"
+step="0.1"
+value="40">
+</div>
+
+
+<div class="row">
+<div>
+<div class="label">حداکثر دمای کلکتور</div>
+<div class="unit">Collector Maximum — °C</div>
+</div>
+
+<input
+id="maxCollector"
+type="number"
+step="0.1"
+value="120">
+</div>
+
+
+<div class="row">
+<div>
+<div class="label">حداکثر دمای آب گرم</div>
+<div class="unit">DHW Maximum — °C</div>
+</div>
+
+<input
+id="maxDhw"
+type="number"
+step="0.1"
+value="60">
+</div>
+
+</div>
+
+
+<!-- BUILDING -->
+
+<div class="card">
+
+<h2>🏢 مدل حرارتی ساختمان</h2>
+
+<div class="row">
+
+<div>
+<div class="label">سطح حرارتی ساختمان</div>
+<div class="unit">Building Thermal Level</div>
+</div>
+
+<select id="buildingLevel">
+
+<option value="A">A — بسیار سبک</option>
+<option value="B">B — سبک</option>
+<option value="C" selected>C — متوسط</option>
+<option value="D">D — سنگین</option>
+<option value="E">E — بسیار سنگین / ذخیره حرارتی بالا</option>
+
+</select>
+
+</div>
+
+<div class="row">
+<div class="label">ضریب انتقال حرارت ساختمان</div>
+<input id="thermalCoefficient"
+type="number"
+step="0.01"
+value="1">
+</div>
+
+<div class="row">
+<div class="label">مساحت ساختمان — m²</div>
+<input id="buildingArea"
+type="number"
+step="1"
+value="100">
+</div>
+
+<div class="row">
+<div class="label">ارتفاع ساختمان — m</div>
+<input id="buildingHeight"
+type="number"
+step="0.1"
+value="3">
+</div>
+
+</div>
+
+
+<!-- SCHEDULE -->
+
+<div class="card">
+
+<h2>🕒 Schedule / Time Engine</h2>
+
+<div class="switch">
+<span>Schedule فعال</span>
+<input id="scheduleActive"
+type="checkbox"
+checked>
+</div>
+
+<div class="switch">
+<span>Preheating فعال</span>
+<input id="preheating"
+type="checkbox">
+</div>
+
+<div class="row">
+<div class="label">زمان شروع</div>
+<input id="startTime" type="time" value="06:00">
+</div>
+
+<div class="row">
+<div class="label">زمان پایان</div>
+<input id="endTime" type="time" value="17:00">
+</div>
+
+<h3>ضریب زمانی</h3>
+
+<div class="slider">
+
+<input
+id="timeMultiplierRange"
+type="range"
+min="1"
+max="600"
+step="1"
+value="60"
+oninput="document.getElementById('timeMultiplier').value=this.value">
+
+<input
+id="timeMultiplier"
+type="number"
+min="1"
+max="3600"
+step="1"
+value="60"
+oninput="document.getElementById('timeMultiplierRange').value=this.value">
+
+</div>
+
+<div style="margin-top:8px">
+<span class="badge">
+× <span id="timeMultiplierLabel">60</span> seconds
+</span>
+</div>
+
+<h3>Minimum ON / OFF</h3>
+
+<div class="row">
+<div class="label">Minimum ON</div>
+<input id="minOn" type="number" value="60">
+</div>
+
+<div class="row">
+<div class="label">Minimum OFF</div>
+<input id="minOff" type="number" value="60">
+</div>
+
+</div>
+
+
+<!-- GAS -->
+
+<div class="card">
+
+<h2>🔥 Gas / MQ-2</h2>
+
+<div class="row">
+<div>
+<div class="label">MQ-2 Raw</div>
+<div class="unit">0 – 4095</div>
+</div>
+
+<div class="slider">
+
+<input
+id="gasRange"
+type="range"
+min="0"
+max="4095"
+step="1"
+value="300"
+oninput="sync('gas')">
+
+<input
+id="gas"
+type="number"
+min="0"
+max="4095"
+value="300"
+oninput="sync('gas')">
+
+</div>
+</div>
+
+<div class="row">
+<div class="label">Gas Safety Threshold</div>
+<input id="gasThreshold"
+type="number"
+value="2500">
+</div>
+
+<div class="switch">
+<span>Gas Sensor فعال</span>
+<input id="gasEnabled" type="checkbox" checked>
+</div>
+
+</div>
+
+
+<!-- EQUIPMENT -->
+
+<div class="card">
+
+<h2>⚙️ وضعیت تجهیزات</h2>
+
+<div class="switch">
+<span>Boiler Available</span>
+<input id="boilerAvailable" type="checkbox" checked>
+</div>
+
+<div class="switch">
+<span>Burner Available</span>
+<input id="burnerAvailable" type="checkbox" checked>
+</div>
+
+<div class="switch">
+<span>Pump Available</span>
+<input id="pumpAvailable" type="checkbox" checked>
+</div>
+
+<div class="switch">
+<span>MQ-2 Available</span>
+<input id="gasAvailable" type="checkbox" checked>
+</div>
+
+<div class="switch">
+<span>DS18B20 Available</span>
+<input id="sensorAvailable" type="checkbox" checked>
+</div>
+
+</div>
+
+
+<!-- FAULT INJECTION -->
+
+<div class="card">
+
+<h2>🧪 Fault Injection</h2>
+
+<div class="switch">
+<span>خرابی سنسور دما</span>
+<input id="faultSensor" type="checkbox">
+</div>
+
+<div class="switch">
+<span>خرابی ارتباط</span>
+<input id="faultCommunication" type="checkbox">
+</div>
+
+<div class="switch">
+<span>خرابی Boiler</span>
+<input id="faultBoiler" type="checkbox">
+</div>
+
+<div class="switch">
+<span>خرابی Burner</span>
+<input id="faultBurner" type="checkbox">
+</div>
+
+<div class="switch">
+<span>خرابی Pump</span>
+<input id="faultPump" type="checkbox">
+</div>
+
+<button
+class="btn-red"
+style="width:100%"
+onclick="injectFaults()">
+🚨 APPLY FAULTS
+</button>
+
+</div>
+
+
+<!-- DECISION -->
+
+<div class="card">
+
+<h2>🧠 Decision Engine</h2>
+
+<div class="big-state">
+
+<div>تصمیم فعلی</div>
+
+<div
+id="decision"
+class="value UNKNOWN">
+UNKNOWN
+</div>
+
+</div>
+
+<div class="row">
+<div class="label">Reason Code</div>
+<input id="reasonCode" readonly>
+</div>
+
+<div class="row">
+<div class="label">Reason Message</div>
+<input id="reasonMessage" readonly>
+</div>
+
+<div class="row">
+<div class="label">Safety Active</div>
+<input id="safetyActive" readonly>
+</div>
+
+</div>
+
+
+<!-- ACTUATORS -->
+
+<div class="card">
+
+<h2>⚡ Actuators</h2>
+
+<div class="actuators">
+
+<div class="actuator">
+
+<div class="actuator-name">
+BOILER
+</div>
+
+<div
+id="boilerState"
+class="actuator-value OFF">
+OFF
+</div>
+
+</div>
+
+
+<div class="actuator">
+
+<div class="actuator-name">
+BURNER
+</div>
+
+<div
+id="burnerState"
+class="actuator-value OFF">
+OFF
+</div>
+
+</div>
+
+
+<div class="actuator">
+
+<div class="actuator-name">
+PUMP
+</div>
+
+<div
+id="pumpState"
+class="actuator-value OFF">
+OFF
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+
+<!-- ERRORS -->
+
+<div class="card">
+
+<h2>🚨 خطاها و هشدارها</h2>
+
+<div id="errors"
+class="error-list">
+
+<div class="success">
+خطایی ثبت نشده است.
+</div>
+
+</div>
+
+</div>
+
+
+<!-- COMMANDS -->
+
+<div class="card full">
+
+<h2>📡 Commands</h2>
+
+<div id="commands"
+class="log">
+No commands yet.
+</div>
+
+</div>
+
+
+<!-- LOG -->
+
+<div class="card full">
+
+<h2>📜 Event Log</h2>
+
+<div id="log"
+class="log">
+System initialized...
+</div>
+
+</div>
+
+
+<!-- JSON -->
+
+<div class="card full">
+
+<h2>🔎 Raw API Response</h2>
+
+<div id="raw"
+class="log">
+No response yet.
+</div>
+
+</div>
+
+
+</div>
+
+</div>
+
+
+<footer>
+
+Boiler Decision Engine — Super Admin / Mechanical & Energy Commissioning Panel
+
+</footer>
+
+
+<script>
+
+let mode = "AUTO";
+
+
+function $(id){
+    return document.getElementById(id);
+}
+
+
+function api(){
+    return $("apiUrl").value.replace(/\/$/,"");
+}
+
+
+function log(message){
+
+    const time =
+        new Date().toLocaleTimeString("fa-IR");
+
+    $("log").textContent +=
+        "\\n[" + time + "] " + message;
+
+    $("log").scrollTop =
+        $("log").scrollHeight;
+}
+
+
+function clearLog(){
+    $("log").textContent =
+        "Log cleared...";
+}
+
+
+function setMode(value){
+
+    mode = value;
+
+    $("modeBadge").textContent = value;
+
+    $("autoBtn").classList.toggle(
+        "active",
+        value === "AUTO"
+    );
+
+    $("manualBtn").classList.toggle(
+        "active",
+        value === "MANUAL"
+    );
+
+    log("Mode changed → " + value);
+}
+
+
+function sync(name){
+
+    const range = $(name + "Range");
+    const input = $(name);
+
+    input.value = range.value;
+
+    if(name === "gas"){
+        $("gasRange").value = input.value;
+    }
+}
+
+
+function health(){
+
+    fetch(api()+"/api/test/health")
+
+    .then(r => r.json())
+
+    .then(data => {
+
+        $("apiDot").classList.add("ok");
+        $("apiStatus").textContent =
+            "API ONLINE";
+
+        log(
+            "HEALTH OK → " +
+            data.service
+        );
+
+    })
+
+    .catch(error => {
+
+        $("apiDot").classList.remove("ok");
+
+        $("apiStatus").textContent =
+            "API OFFLINE";
+
+        addError(
+            "API_CONNECTION",
+            error.message
+        );
+
+        log(
+            "HEALTH ERROR → " +
+            error.message
+        );
+
+    });
+}
+
+
+function getState(){
+
+    fetch(api()+"/api/test/state")
+
+    .then(r => r.json())
+
+    .then(data => {
+
+        applyResponse(data);
+
+        log("STATE received");
+
+    })
+
+    .catch(error => {
+
+        addError(
+            "STATE_ERROR",
+            error.message
+        );
+
+    });
+
+}
+
+
+function collectSensors(){
+
+    return {
+
+        indoor_temperature:
+            Number($("indoor").value),
+
+        outdoor_temperature:
+            Number($("outdoor").value),
+
+        boiler_temperature:
+            Number($("boiler").value),
+
+        collector_temperature:
+            Number($("collector").value),
+
+        dhw_temperature:
+            Number($("dhw").value),
+
+        gas_raw:
+            Number($("gas").value),
+
+        target_temperature:
+            Number($("target").value),
+
+        offset:
+            Number($("offset").value),
+
+        min_outdoor_temperature:
+            Number($("minOutdoor").value),
+
+        max_boiler_temperature:
+            Number($("maxBoiler").value),
+
+        min_boiler_temperature:
+            Number($("minBoiler").value),
+
+        max_collector_temperature:
+            Number($("maxCollector").value),
+
+        max_dhw_temperature:
+            Number($("maxDhw").value),
+
+        schedule_active:
+            $("scheduleActive").checked,
+
+        preheating_active:
+            $("preheating").checked,
+
+        boiler_available:
+            $("boilerAvailable").checked,
+
+        burner_available:
+            $("burnerAvailable").checked,
+
+        pump_available:
+            $("pumpAvailable").checked,
+
+        gas_available:
+            $("gasAvailable").checked,
+
+        sensor_available:
+            $("sensorAvailable").checked,
+
+        building_thermal_level:
+            $("buildingLevel").value,
+
+        thermal_coefficient:
+            Number($("thermalCoefficient").value),
+
+        building_area:
+            Number($("buildingArea").value),
+
+        building_height:
+            Number($("buildingHeight").value),
+
+        start_time:
+            $("startTime").value,
+
+        end_time:
+            $("endTime").value,
+
+        time_multiplier:
+            Number($("timeMultiplier").value),
+
+        minimum_on_time:
+            Number($("minOn").value),
+
+        minimum_off_time:
+            Number($("minOff").value),
+
+        gas_threshold:
+            Number($("gasThreshold").value)
+
+    };
+
+}
+
+
+function buildRequest(action){
+
+    return {
+
+        mode: mode,
+
+        action: action,
+
+        sensors: collectSensors(),
+
+        fault_sensor:
+            $("faultSensor").checked,
+
+        fault_communication:
+            $("faultCommunication").checked,
+
+        fault_boiler:
+            $("faultBoiler").checked,
+
+        fault_burner:
+            $("faultBurner").checked,
+
+        fault_pump:
+            $("faultPump").checked
+
+    };
+
+}
+
+
+async function sendEvaluation(action="RUN"){
+
+    const body =
+        buildRequest(action);
+
+    log(
+        "EVALUATE → " +
+        action
+    );
+
+    try{
+
+        const response =
+            await fetch(
+                api()+"/api/test/evaluate",
+                {
+                    method:"POST",
+
+                    headers:{
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body:
+                        JSON.stringify(body)
+                }
+            );
+
+        const data =
+            await response.json();
+
+        $("raw").textContent =
+            JSON.stringify(
+                data,
+                null,
+                2
+            );
+
+        if(!response.ok){
+
+            addError(
+                "API_ERROR",
+                JSON.stringify(data)
+            );
+
+            return;
+        }
+
+        applyResponse(data);
+
+        log(
+            "DECISION → " +
+            data.decision
+        );
+
+    }
+
+    catch(error){
+
+        addError(
+            "API_CONNECTION",
+            error.message
+        );
+
+        log(
+            "REQUEST ERROR → " +
+            error.message
+        );
+
+    }
+
+}
+
+
+function sendAction(action){
+
+    sendEvaluation(action);
+
+}
+
+
+function injectFaults(){
+
+    sendEvaluation("RUN");
+
+}
+
+
+async function resetSafety(){
+
+    try{
+
+        const response =
+            await fetch(
+                api()+"/api/test/reset-safety",
+                {
+                    method:"POST"
+                }
+            );
+
+        const data =
+            await response.json();
+
+        $("raw").textContent =
+            JSON.stringify(
+                data,
+                null,
+                2
+            );
+
+        log(
+            "SAFETY RESET"
+        );
+
+        clearErrors();
+
+    }
+
+    catch(error){
+
+        addError(
+            "RESET_ERROR",
+            error.message
+        );
+
+    }
+
+}
+
+
+function applyResponse(data){
+
+    if(data.decision){
+
+        $("decision").textContent =
+            data.decision;
+
+        $("decision").className =
+            "value " +
+            data.decision;
+    }
+
+
+    if(data.reason_code !== undefined){
+
+        $("reasonCode").value =
+            data.reason_code || "";
+    }
+
+
+    if(data.reason_message !== undefined){
+
+        $("reasonMessage").value =
+            data.reason_message || "";
+    }
+
+
+    if(data.safety_active !== undefined){
+
+        $("safetyActive").value =
+            data.safety_active
+                ? "YES"
+                : "NO";
+    }
+
+
+    if(data.actuators){
+
+        setActuator(
+            "boilerState",
+            data.actuators.boiler
+        );
+
+        setActuator(
+            "burnerState",
+            data.actuators.burner
+        );
+
+        setActuator(
+            "pumpState",
+            data.actuators.pump
+        );
+    }
+
+
+    if(data.commands){
+
+        $("commands").textContent =
+            JSON.stringify(
+                data.commands,
+                null,
+                2
+            );
+    }
+
+}
+
+
+function setActuator(id,value){
+
+    const el = $(id);
+
+    el.textContent =
+        value || "UNKNOWN";
+
+    el.className =
+        "actuator-value " +
+        (value || "UNKNOWN");
+
+}
+
+
+function addError(code,message){
+
+    const box =
+        $("errors");
+
+    const item =
+        document.createElement("div");
+
+    item.className =
+        "error";
+
+    item.innerHTML =
+        "<b>"+escapeHtml(code)+
+        "</b><br>"+
+        escapeHtml(message);
+
+    box.prepend(item);
+
+}
+
+
+function clearErrors(){
+
+    $("errors").innerHTML =
+        '<div class="success">'+
+        'خطایی ثبت نشده است.'+
+        '</div>';
+
+}
+
+
+function escapeHtml(text){
+
+    return String(text)
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+
+}
+
+
+$("timeMultiplier").addEventListener(
+    "input",
+    function(){
+
+        $("timeMultiplierRange").value =
+            this.value;
+
+        $("timeMultiplierLabel").textContent =
+            this.value;
+
+    }
+);
+
+
+$("timeMultiplierRange").addEventListener(
+    "input",
+    function(){
+
+        $("timeMultiplier").value =
+            this.value;
+
+        $("timeMultiplierLabel").textContent =
+            this.value;
+
+    }
+);
+
+
+health();
+
+</script>
+
+</body>
+</html>

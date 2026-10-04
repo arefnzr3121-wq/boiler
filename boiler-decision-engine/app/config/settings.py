@@ -108,6 +108,13 @@ class Settings(BaseSettings):
         ge=0.0,
     )
 
+    preheating_enabled: bool = True
+    max_preheat_minutes: int = Field(default=120, ge=0)
+
+    weather_offset_enabled: bool = True
+    weather_offset_slope_c_per_c: float = Field(default=0.05, ge=0.0)
+    weather_offset_max_c: float = Field(default=2.0, ge=0.0)
+
     # ========================================================
     # SAFETY
     # ========================================================

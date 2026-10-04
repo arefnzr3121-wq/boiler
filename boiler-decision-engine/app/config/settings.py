@@ -55,6 +55,8 @@ class Settings(BaseSettings):
 
     mqtt_sensor_topic: str = "boiler/sensors"
 
+    mqtt_equipment_topic: str = "boiler/equipment"
+
     mqtt_command_topic: str = "boiler/commands"
 
     mqtt_state_topic: str = "boiler/state"

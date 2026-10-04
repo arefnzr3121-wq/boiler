@@ -30,6 +30,7 @@ from app.validation.data_validator import DataValidator
 from app.safety.safety_engine import SafetyEngine, SafetyResult
 from app.schedule.schedule_engine import ScheduleEngine
 from app.comfort.comfort_engine import ComfortEngine, ComfortInput
+from app.comfort.preheating import PreheatingConfig, PreheatingEngine
 from app.building.building_engine import BuildingCalculationInput, BuildingEngine
 from app.decision.decision_engine import DecisionEngine, DecisionInput
 
@@ -92,6 +93,12 @@ class BoilerDecisionEngine:
 
         # Comfort
         self.comfort_engine = ComfortEngine()
+        self.preheating_engine = PreheatingEngine(
+            PreheatingConfig(
+                enabled=self.settings.preheating_enabled,
+                max_preheat_minutes=self.settings.max_preheat_minutes,
+            )
+        )
 
         # Building
         self.building_engine = BuildingEngine()
@@ -432,12 +439,33 @@ class BoilerDecisionEngine:
         # 8. Comfort
         # --------------------------------------------------
 
+        preheating_active = False
+        next_window_start = self.schedule_engine.get_next_window_start(
+            seasonal_schedule=self.seasonal_schedule,
+            current_datetime=now,
+            timezone_name=self.settings.timezone,
+        )
+        if (
+            not schedule_state.active
+            and next_window_start is not None
+            and indoor_temperature is not None
+        ):
+            preheating_active = self.preheating_engine.should_preheat(
+                current_datetime=now.astimezone(next_window_start.tzinfo),
+                schedule_start=next_window_start,
+                indoor_temperature_c=indoor_temperature,
+                target_temperature_c=self.comfort_settings.target_temperature_c,
+                outdoor_temperature_c=outdoor_temperature,
+            )
+
+        offset_c = self._calculate_weather_offset(outdoor_temperature)
+
         comfort_input = ComfortInput(
             indoor_temperature_c=indoor_temperature,
             outdoor_temperature_c=outdoor_temperature,
             previous_heating_state=self.previous_heating_state,
-            offset_c=0.0,
-            preheating_active=False,
+            offset_c=offset_c,
+            preheating_active=preheating_active,
         )
 
         comfort_snapshot = self.comfort_engine.evaluate(
@@ -613,6 +641,19 @@ class BoilerDecisionEngine:
             return False
 
         return bool(getattr(snapshot, equipment_id).fault)
+
+    def _calculate_weather_offset(self, outdoor_temperature: float | None) -> float:
+        """Apply a small configurable weather-compensation offset."""
+        if (
+            not self.settings.weather_offset_enabled
+            or outdoor_temperature is None
+        ):
+            return 0.0
+
+        reference_temperature = 15.0
+        offset = max(0.0, reference_temperature - outdoor_temperature)
+        offset *= self.settings.weather_offset_slope_c_per_c
+        return min(offset, self.settings.weather_offset_max_c)
 
     # ======================================================
     # SENSOR HELPERS

@@ -563,6 +563,8 @@ class BoilerDecisionEngine:
 
         output = self.output_engine.evaluate(
             decision_state=decision.boiler,
+            burner_state=decision.burner,
+            pump_state=decision.pump,
             reason_code=getattr(
                 decision,
                 "reason_code",

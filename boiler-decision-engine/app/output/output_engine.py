@@ -18,6 +18,8 @@ class OutputEngine:
         reason_code: str | None = None,
         reason_message: str | None = None,
         timestamp: datetime | None = None,
+        burner_state: DecisionState | None = None,
+        pump_state: DecisionState | None = None,
     ) -> OutputSnapshot:
         current_time = timestamp or datetime.now(timezone.utc)
 
@@ -55,6 +57,13 @@ class OutputEngine:
         final_reason_code = reason_code or default_reason_code
         final_reason_message = reason_message or default_reason_message
 
+        burner_actuator_state = self._to_actuator_state(
+            burner_state or decision_state
+        )
+        pump_actuator_state = self._to_actuator_state(
+            pump_state or decision_state
+        )
+
         commands = (
             ActuatorCommand(
                 equipment=EquipmentType.BOILER,
@@ -65,14 +74,14 @@ class OutputEngine:
             ),
             ActuatorCommand(
                 equipment=EquipmentType.BURNER,
-                state=actuator_state,
+                state=burner_actuator_state,
                 reason_code=final_reason_code,
                 reason_message=final_reason_message,
                 timestamp=current_time,
             ),
             ActuatorCommand(
                 equipment=EquipmentType.PUMP,
-                state=actuator_state,
+                state=pump_actuator_state,
                 reason_code=final_reason_code,
                 reason_message=final_reason_message,
                 timestamp=current_time,
@@ -81,9 +90,16 @@ class OutputEngine:
 
         return OutputSnapshot(
             boiler=actuator_state,
-            burner=actuator_state,
-            pump=actuator_state,
+            burner=burner_actuator_state,
+            pump=pump_actuator_state,
             system_state=decision_state,
             commands=commands,
             timestamp=current_time,
         )
+
+
+    @staticmethod
+    def _to_actuator_state(state: DecisionState) -> ActuatorState:
+        if state == DecisionState.ON:
+            return ActuatorState.ON
+        return ActuatorState.OFF

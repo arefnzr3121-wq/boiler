@@ -91,6 +91,45 @@ class ScheduleEngine:
             timezone_name,
         ).active_window
 
+    def get_next_window_start(
+        self,
+        seasonal_schedule: SeasonalSchedule,
+        current_datetime: datetime | None = None,
+        timezone_name: str = "Asia/Tehran",
+    ) -> datetime | None:
+        """Return the next scheduled window start within seven days."""
+        current = self._normalize_datetime(current_datetime, timezone_name)
+        if not seasonal_schedule.enabled:
+            return None
+
+        weekly = seasonal_schedule.weekly_schedule
+        if not weekly.enabled:
+            return None
+
+        local_tz = ZoneInfo(timezone_name)
+
+        for day_offset in range(0, 8):
+            candidate_date = current.date()
+            from datetime import timedelta
+            candidate_date = candidate_date + timedelta(days=day_offset)
+            daily = weekly.get_day(candidate_date.weekday())
+            if daily is None or not daily.enabled:
+                continue
+
+            for window in sorted(daily.windows, key=lambda item: item.start_time):
+                start = datetime.combine(
+                    candidate_date,
+                    window.start_time,
+                    tzinfo=local_tz,
+                )
+                if start >= current and (
+                    seasonal_schedule.season
+                    == self.season_detector.detect_from_datetime(start)
+                ):
+                    return start
+
+        return None
+
     def _find_active_window(
         self,
         daily_schedule: DailySchedule,

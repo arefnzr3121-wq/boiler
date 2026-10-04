@@ -23,6 +23,8 @@ from app.models.schedule import (
     WeeklySchedule,
 )
 from app.models.sensor import SensorReading
+from app.models.equipment import EquipmentSnapshot
+from app.equipment_feedback import EquipmentFeedbackParser
 
 from app.validation.data_validator import DataValidator
 from app.safety.safety_engine import SafetyEngine, SafetyResult
@@ -77,6 +79,7 @@ class BoilerDecisionEngine:
 
         # Communication
         self.message_handler = MessageHandler()
+        self.equipment_feedback_parser = EquipmentFeedbackParser()
 
         # Validation
         self.data_validator = DataValidator()
@@ -124,6 +127,7 @@ class BoilerDecisionEngine:
         self.last_output: OutputSnapshot | None = None
         self.last_decision: DecisionResult | None = None
         self.last_sensor_readings: list[SensorReading] = []
+        self.last_equipment_snapshot: EquipmentSnapshot | None = None
 
         # MQTT
         self.mqtt = MQTTClient(
@@ -232,6 +236,14 @@ class BoilerDecisionEngine:
             "MQTT message received: %s",
             topic,
         )
+
+        if topic == self.settings.mqtt_equipment_topic:
+            try:
+                self.last_equipment_snapshot = self.equipment_feedback_parser.parse(payload)
+                logger.info("Equipment feedback updated")
+            except Exception:
+                logger.exception("Invalid equipment feedback")
+            return
 
         if topic != self.settings.mqtt_sensor_topic:
             logger.warning(
@@ -413,6 +425,7 @@ class BoilerDecisionEngine:
         schedule_state = self.schedule_engine.evaluate(
             seasonal_schedule=self.seasonal_schedule,
             current_datetime=now,
+            timezone_name=self.settings.timezone,
         )
 
         # --------------------------------------------------
@@ -451,11 +464,11 @@ class BoilerDecisionEngine:
             indoor_temperature_c=indoor_temperature,
             outdoor_temperature_c=outdoor_temperature,
             target_temperature_c=target_temperature,
-            design_load_w=10000.0,
-            base_load_per_m2_w=100.0,
-            thermal_resistance_k_per_w=0.01,
-            thermal_capacity_wh_per_k=10000.0,
-            time_step_hours=1.0,
+            design_load_w=self.settings.design_load_w,
+            base_load_per_m2_w=self.settings.base_load_per_m2_w,
+            thermal_resistance_k_per_w=self.settings.thermal_resistance_k_per_w,
+            thermal_capacity_wh_per_k=self.settings.thermal_capacity_wh_per_k,
+            time_step_hours=self.settings.time_step_hours,
         )
 
         building_result = self.building_engine.calculate(
@@ -489,9 +502,13 @@ class BoilerDecisionEngine:
             heating_demand=building_result.heating_demand,
             estimated_load_w=building_result.estimated_load_w,
 
-            boiler_available=True,
-            burner_available=True,
-            pump_available=True,
+            boiler_available=self._equipment_available("boiler"),
+            burner_available=self._equipment_available("burner"),
+            pump_available=self._equipment_available("pump"),
+
+            boiler_fault=self._equipment_fault("boiler"),
+            burner_fault=self._equipment_fault("burner"),
+            pump_fault=self._equipment_fault("pump"),
 
             previous_boiler_state=self._get_output_state(
                 "boiler"
@@ -571,6 +588,25 @@ class BoilerDecisionEngine:
         )
 
         return output
+
+    # ======================================================
+    # EQUIPMENT FEEDBACK HELPERS
+    # ======================================================
+
+    def _equipment_available(self, equipment_id: str) -> bool:
+        snapshot = self.last_equipment_snapshot
+        if snapshot is None:
+            return not self.settings.equipment_feedback_required
+
+        state = getattr(snapshot, equipment_id)
+        return state.is_available and not state.fault
+
+    def _equipment_fault(self, equipment_id: str) -> bool:
+        snapshot = self.last_equipment_snapshot
+        if snapshot is None:
+            return False
+
+        return bool(getattr(snapshot, equipment_id).fault)
 
     # ======================================================
     # SENSOR HELPERS

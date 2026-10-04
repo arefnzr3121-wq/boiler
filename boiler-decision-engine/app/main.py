@@ -598,6 +598,12 @@ class BoilerDecisionEngine:
         if snapshot is None:
             return not self.settings.equipment_feedback_required
 
+        age = (
+            datetime.now(timezone.utc) - snapshot.timestamp.astimezone(timezone.utc)
+        ).total_seconds()
+        if age > self.settings.equipment_feedback_timeout_seconds:
+            return False
+
         state = getattr(snapshot, equipment_id)
         return state.is_available and not state.fault
 

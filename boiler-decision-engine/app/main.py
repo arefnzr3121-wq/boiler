@@ -565,16 +565,8 @@ class BoilerDecisionEngine:
             decision_state=decision.boiler,
             burner_state=decision.burner,
             pump_state=decision.pump,
-            reason_code=getattr(
-                decision,
-                "reason_code",
-                "",
-            ),
-            reason_message=getattr(
-                decision,
-                "reason_message",
-                "",
-            ),
+            reason_code=self._decision_reason_code(decision),
+            reason_message=self._decision_reason_message(decision),
         )
 
         self.last_output = output
@@ -618,6 +610,12 @@ class BoilerDecisionEngine:
         )
 
         return output
+
+    def _decision_reason_code(self, decision: DecisionResult) -> str:
+        return decision.reasons[0].code if decision.reasons else ""
+
+    def _decision_reason_message(self, decision: DecisionResult) -> str:
+        return decision.reasons[0].message if decision.reasons else ""
 
     # ======================================================
     # EQUIPMENT FEEDBACK HELPERS

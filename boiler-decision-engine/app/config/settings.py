@@ -126,10 +126,37 @@ class Settings(BaseSettings):
     )
 
     # ========================================================
-    # MODEL CONFIGURATION
+    # RUNTIME / TIMEZONE
+    # ========================================================
+
+    # Timezone of the physical building. Schedule calculations in the
+    # application layer must use this timezone, not the server timezone.
+    timezone: str = "Asia/Tehran"
+
+    # ========================================================
+    # EQUIPMENT FEEDBACK
+    # ========================================================
+
+    # When enabled, a missing equipment feedback snapshot is treated as
+    # unavailable (fail-safe). Keep false only for simulation/bench tests.
+    equipment_feedback_required: bool = False
+
+    equipment_feedback_timeout_seconds: int = Field(
+        default=15,
+        ge=1,
+    )
+
+    # ========================================================
+    # BUILDING MODEL
     # ========================================================
 
     building_model: str = "A"
+
+    design_load_w: float = Field(default=10000.0, gt=0.0)
+    base_load_per_m2_w: float = Field(default=100.0, gt=0.0)
+    thermal_resistance_k_per_w: float = Field(default=0.01, gt=0.0)
+    thermal_capacity_wh_per_k: float = Field(default=10000.0, gt=0.0)
+    time_step_hours: float = Field(default=1.0, gt=0.0)
 
     # ========================================================
     # PYDANTIC SETTINGS

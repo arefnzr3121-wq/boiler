@@ -1,4 +1,5 @@
-from datetime import datetime, time, timezone
+from datetime import datetime, time
+from zoneinfo import ZoneInfo
 
 from app.config.constants import Season
 from app.models.schedule import (
@@ -6,107 +7,56 @@ from app.models.schedule import (
     ScheduleState,
     ScheduleWindow,
     SeasonalSchedule,
-    WeeklySchedule,
 )
 from app.schedule.season import SeasonDetector
 
 
 class ScheduleEngine:
-    """
-    موتور مدیریت برنامه زمانی سیستم موتورخانه.
+    """Evaluate heating schedules in the physical building timezone."""
 
-    وظایف:
-    - تشخیص فصل
-    - تشخیص روز هفته
-    - بررسی فعال بودن Schedule
-    - پیدا کردن Window فعال
-    - تولید ScheduleState
-    """
-
-    def __init__(
-        self,
-        season_detector: SeasonDetector | None = None,
-    ):
+    def __init__(self, season_detector: SeasonDetector | None = None):
         self.season_detector = season_detector or SeasonDetector()
 
     def evaluate(
         self,
         seasonal_schedule: SeasonalSchedule,
         current_datetime: datetime | None = None,
+        timezone_name: str = "Asia/Tehran",
     ) -> ScheduleState:
-        """
-        ارزیابی وضعیت Schedule در یک لحظه مشخص.
-        """
-
-        current_datetime = self._normalize_datetime(current_datetime)
+        current_datetime = self._normalize_datetime(
+            current_datetime,
+            timezone_name,
+        )
 
         current_season = self.season_detector.detect_from_datetime(
             current_datetime
         )
-
         current_day_of_week = current_datetime.weekday()
         current_time = current_datetime.time()
 
-        # اگر Schedule کلی غیرفعال باشد
         if not seasonal_schedule.enabled:
-            return ScheduleState(
-                current_season=current_season,
-                schedule_enabled=False,
-                active=False,
-                current_day_of_week=current_day_of_week,
-                current_time=current_time,
-                active_window=None,
+            return self._state(
+                current_season, False, current_day_of_week, current_time
             )
 
-        # اگر فصل تعریف‌شده با فصل فعلی یکی نباشد
         if seasonal_schedule.season != current_season:
-            return ScheduleState(
-                current_season=current_season,
-                schedule_enabled=True,
-                active=False,
-                current_day_of_week=current_day_of_week,
-                current_time=current_time,
-                active_window=None,
+            return self._state(
+                current_season, False, current_day_of_week, current_time
             )
 
-        weekly_schedule = seasonal_schedule.weekly_schedule
-
-        if not weekly_schedule.enabled:
-            return ScheduleState(
-                current_season=current_season,
-                schedule_enabled=True,
-                active=False,
-                current_day_of_week=current_day_of_week,
-                current_time=current_time,
-                active_window=None,
+        weekly = seasonal_schedule.weekly_schedule
+        if not weekly.enabled:
+            return self._state(
+                current_season, False, current_day_of_week, current_time
             )
 
-        daily_schedule = weekly_schedule.get_day(current_day_of_week)
-
-        if daily_schedule is None:
-            return ScheduleState(
-                current_season=current_season,
-                schedule_enabled=True,
-                active=False,
-                current_day_of_week=current_day_of_week,
-                current_time=current_time,
-                active_window=None,
+        daily = weekly.get_day(current_day_of_week)
+        if daily is None or not daily.enabled:
+            return self._state(
+                current_season, False, current_day_of_week, current_time
             )
 
-        if not daily_schedule.enabled:
-            return ScheduleState(
-                current_season=current_season,
-                schedule_enabled=True,
-                active=False,
-                current_day_of_week=current_day_of_week,
-                current_time=current_time,
-                active_window=None,
-            )
-
-        active_window = self._find_active_window(
-            daily_schedule=daily_schedule,
-            current_time=current_time,
-        )
+        active_window = self._find_active_window(daily, current_time)
 
         return ScheduleState(
             current_season=current_season,
@@ -121,63 +71,66 @@ class ScheduleEngine:
         self,
         seasonal_schedule: SeasonalSchedule,
         current_datetime: datetime | None = None,
+        timezone_name: str = "Asia/Tehran",
     ) -> bool:
-        """
-        فقط وضعیت فعال یا غیرفعال بودن Schedule را برمی‌گرداند.
-        """
-
-        state = self.evaluate(
-            seasonal_schedule=seasonal_schedule,
-            current_datetime=current_datetime,
-        )
-
-        return state.active
+        return self.evaluate(
+            seasonal_schedule,
+            current_datetime,
+            timezone_name,
+        ).active
 
     def get_active_window(
         self,
         seasonal_schedule: SeasonalSchedule,
         current_datetime: datetime | None = None,
+        timezone_name: str = "Asia/Tehran",
     ) -> ScheduleWindow | None:
-        """
-        Window فعال را برمی‌گرداند.
-        """
-
-        state = self.evaluate(
-            seasonal_schedule=seasonal_schedule,
-            current_datetime=current_datetime,
-        )
-
-        return state.active_window
+        return self.evaluate(
+            seasonal_schedule,
+            current_datetime,
+            timezone_name,
+        ).active_window
 
     def _find_active_window(
         self,
         daily_schedule: DailySchedule,
         current_time: time,
     ) -> ScheduleWindow | None:
-        """
-        پیدا کردن اولین بازه زمانی فعال.
-        """
-
         for window in daily_schedule.windows:
             if window.contains(current_time):
                 return window
-
         return None
 
     def _normalize_datetime(
         self,
         current_datetime: datetime | None,
+        timezone_name: str,
     ) -> datetime:
-        """
-        اگر زمان وارد نشده باشد، زمان فعلی سیستم استفاده می‌شود.
-
-        زمان naive به UTC تبدیل می‌شود.
-        """
+        try:
+            local_tz = ZoneInfo(timezone_name)
+        except Exception as exc:
+            raise ValueError(f"Invalid timezone: {timezone_name}") from exc
 
         if current_datetime is None:
-            return datetime.now(timezone.utc)
+            return datetime.now(local_tz)
 
         if current_datetime.tzinfo is None:
-            return current_datetime.replace(tzinfo=timezone.utc)
+            return current_datetime.replace(tzinfo=local_tz)
 
-        return current_datetime
+        return current_datetime.astimezone(local_tz)
+
+    @staticmethod
+    def _state(
+        season: Season,
+        schedule_enabled: bool,
+        day_of_week: int,
+        current_time: time,
+    ) -> ScheduleState:
+        return ScheduleState(
+            current_season=season,
+            schedule_enabled=schedule_enabled,
+            active=False,
+            current_day_of_week=day_of_week,
+            current_time=current_time,
+            active_window=None,
+        )
